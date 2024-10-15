@@ -28,6 +28,6 @@ export class JWtStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     const { password, ...rest } = user;
-    return { user: rest };
+    return rest;
   }
 }
