@@ -19,7 +19,7 @@ import { PugAdapter } from '@nestjs-modules/mailer/dist/adapters/pug.adapter';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
         transport: {
-          service: 'Gmail',
+          service: configService.get('MAIL_SERVICE'),
           auth: {
             user: configService.get('MAIL'),
             pass: configService.get('MAIL_PASSWORD'),
