@@ -3,7 +3,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { EditUserDto } from './dto/edit-user.dto';
 import { User } from '@prisma/client';
 import { MailerService } from '@nestjs-modules/mailer';
-import { log } from 'handlebars';
 
 @Injectable()
 export class UserService {
@@ -14,16 +13,30 @@ export class UserService {
 
   async sendMail() {
     try {
-      const mailSent = await this.mailerService.sendMail({
-        to: 'naturein30@gmail.com', // list of receivers
-        from: 'noreply@nestjs.com', // sender address
-        subject: 'Testing Nest MailerModule ✔', // Subject line
-        text: 'welcome', // plaintext body
-        html: '<b>welcome</b>', // HTML body content
+      //find all emails
+      const listOfEmails = await this.prisma.user.findMany({
+        select: {
+          email: true,
+        },
       });
+      // map emails to add them in list
+      const emailAddresses = listOfEmails.map((e) => e.email);
+      if (emailAddresses.length > 0) {
+        const mailSent = await this.mailerService.sendMail({
+          to: emailAddresses,
+          from: 'noreply@nestjs.com',
+          subject: 'Testing Nest MailerModule ✔',
+          text: 'welcome',
+          html: '<b>welcome</b>',
+        });
 
-      console.log(mailSent);
-      return { message: 'Mail sent', mailSent };
+        const { response, ...rest } = mailSent;
+        rest.envelope.to = emailAddresses;
+
+        return { message: 'Mail sent to', emailAddresses };
+      } else {
+        return { message: 'No emails found' };
+      }
     } catch (error) {
       console.log(error);
       throw error;
