@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { MailerService } from '@nestjs-modules/mailer';
 import { EditUserDto } from './dto/edit-user.dto';
 import { User } from '@prisma/client';
-import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class UserService {
@@ -11,32 +11,39 @@ export class UserService {
     private readonly mailerService: MailerService,
   ) {}
 
-  async sendMail() {
+  async sendMail(email: string, name: string) {
     try {
       //find all emails
-      const listOfEmails = await this.prisma.user.findMany({
-        select: {
-          email: true,
-        },
-      });
+      // const listOfEmails = await this.prisma.user.findMany({
+      //   select: {
+      //     email: true,
+      //   },
+      // });
       // map emails to add them in list
-      const emailAddresses = listOfEmails.map((e) => e.email);
-      if (emailAddresses.length > 0) {
-        const mailSent = await this.mailerService.sendMail({
-          to: emailAddresses,
-          from: 'noreply@nestjs.com',
-          subject: 'Testing Nest MailerModule ✔',
-          text: 'welcome',
-          html: '<b>welcome</b>',
-        });
+      // const emailAddresses = listOfEmails.map((e) => e.email);
+      const mailSent = await this.mailerService.sendMail({
+        to: email,
+        subject: 'Welcome to Learning Earning!',
+        text: `Hello ${name},
+      
+      Thank you for joining Learning Earning! We're excited to have you on board.
+      
+      Get ready to explore all the amazing features we have to offer. If you have any questions or need assistance, feel free to reach out.
+      
+      Best regards,
+      The Learning Earning Team`,
+        html: `<h1>Welcome to <b>Learning Earning</b>!</h1>
+               <p>Hello ${name},</p>
+               <p>Thank you for joining <b>Learning Earning</b>! We're excited to have you on board.</p>
+               <p>Get ready to explore all the amazing features we have to offer. If you have any questions or need assistance, feel free to reach out.</p>
+               <br>
+               <p>Best regards,<br>The Learning Earning Team</p>`,
+      });
 
-        const { response, ...rest } = mailSent;
-        rest.envelope.to = emailAddresses;
+      const { response, ...rest } = mailSent;
+      rest.envelope.to = email;
 
-        return { message: 'Mail sent to', emailAddresses };
-      } else {
-        return { message: 'No emails found' };
-      }
+      return { message: 'Mail sent to', email };
     } catch (error) {
       console.log(error);
       throw error;

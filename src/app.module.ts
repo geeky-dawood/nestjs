@@ -1,11 +1,14 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { BookmarkModule } from './bookmark/bookmark.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { PugAdapter } from '@nestjs-modules/mailer/dist/adapters/pug.adapter';
+import { OtpService } from './utils/otp/otp.service';
+import { MailService } from './utils/mail/mail.service';
+import { MailModule } from './utils/mail/mail.module';
+import { OtpModule } from './utils/otp/otp.module';
 @Module({
   imports: [
     AuthModule,
@@ -25,16 +28,11 @@ import { PugAdapter } from '@nestjs-modules/mailer/dist/adapters/pug.adapter';
             pass: configService.get('MAIL_PASSWORD'),
           },
         },
-
-        // template: {
-        //   dir: __dirname + '/templates',
-        //   adapter: new PugAdapter(),
-        //   options: {
-        //     strict: true,
-        //   },
-        // },
       }),
     }),
+    MailModule,
+    OtpModule,
   ],
+  providers: [OtpService, MailService],
 })
 export class AppModule {}
