@@ -10,17 +10,35 @@ datasource db {
 model User {
   id            String     @id @default(cuid())
   email         String     @unique
+  google_id     String?    @unique
+  apple_id      String?    @unique
+  facebook_id   String?    @unique
   first_name    String?
   last_name     String?
   password      String
   refresh_token String?
-  isVerified    Boolean    @default(false)
-  isdeleted     Boolean    @default(false)
+  image_url     String?
+  is_verified   Boolean    @default(false)
+  is_deleted    Boolean    @default(false)
+  address       address[]
+  bookmarks     bookmark[]
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
-  bookmarks     bookmark[]
 
   @@map("users")
+}
+
+model address {
+  id        String   @id @default(cuid())
+  address   String
+  city      String
+  state     String
+  country   String
+  zipcode   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User?    @relation(fields: [userId], references: [id])
+  userId    String?  @unique
 }
 
 model bookmark {

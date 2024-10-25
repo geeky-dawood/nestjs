@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class SignupDto {
   @IsEmail()
@@ -38,4 +38,16 @@ export class ChangePasswordDto {
   @IsString()
   @IsNotEmpty()
   confirm_password: string;
+}
+
+export class AppleSSoDto {
+  @IsString()
+  @IsNotEmpty()
+  access_token: string;
+
+  @IsOptional()
+  first_name?: string;
+
+  @IsOptional()
+  last_name?: string;
 }

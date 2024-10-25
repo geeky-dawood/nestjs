@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { SignupDto, LoginDto, ChangePasswordDto } from './dto';
+import { SignupDto, LoginDto, ChangePasswordDto, AppleSSoDto } from './dto';
 import * as argon2 from 'argon2';
 import { Prisma, User } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
@@ -21,7 +21,6 @@ export class AuthService {
     private mailService: MailService,
   ) {}
 
-  //---tokken
   jwtTokken(userid: string, email: string) {
     const payload = { sub: userid, email: email };
     const secret = this.config.get('JWT_SECRET');
@@ -155,11 +154,9 @@ export class AuthService {
         },
       });
 
-      const { password, ...rest } = user;
       return {
         message: 'Token refreshed',
-        user: {
-          ...rest,
+        data: {
           access_token: access_token,
           refresh_token: newRefreshToken,
         },
@@ -179,16 +176,13 @@ export class AuthService {
     try {
       const data = await axios.get(url);
 
-      console.log('Google user info:', data.data);
-
       if (!data.data.sub) {
-        throw new UnauthorizedException('Invalid Google token');
+        throw new UnauthorizedException('Invalid google access token');
       }
-
       //check if user exists
       const user = await this.prisma.user.findUnique({
         where: {
-          email: data.data.email,
+          google_id: data.data.sub,
         },
       });
 
@@ -201,10 +195,27 @@ export class AuthService {
             last_name: data.data.family_name,
             email: data.data.email,
             password: hashPassword,
-            isVerified: true,
+            image_url: data.data.picture,
+            google_id: data.data.sub,
+            is_verified: data.data.email_verified,
           },
         });
+
         const newUserAccessToken = this.jwtTokken(newUser.id, newUser.email);
+        const newUserRefreshToken = this.refreshToken(
+          newUser.id,
+          newUser.email,
+        );
+
+        await this.prisma.user.update({
+          where: {
+            id: newUser.id,
+          },
+          data: {
+            refresh_token: newUserRefreshToken,
+          },
+        });
+
         const { password, ...rest } = newUser;
 
         return {
@@ -212,22 +223,110 @@ export class AuthService {
           user: {
             ...rest,
             access_token: newUserAccessToken,
+            refresh_token: newUserRefreshToken,
           },
         };
       } else {
         //user found
         const oldUserAccessToken = this.jwtTokken(user.id, user.email);
+        const oldUserRefreshToken = this.refreshToken(user.id, user.email);
         const { password, ...rest } = user;
+
         return {
           message: 'Login success',
-          user: { ...rest, access_token: oldUserAccessToken },
+          user: {
+            ...rest,
+            access_token: oldUserAccessToken,
+            refresh_token: oldUserRefreshToken,
+          },
         };
       }
 
       // Further processing
     } catch (error) {
       console.error('Error fetching user info from Google:', error);
-      throw new UnauthorizedException('Invalid Google token');
+      throw new UnauthorizedException('Invalid google access token');
+    }
+  }
+
+  async loginWithApple(dto: AppleSSoDto) {
+    if (!dto.access_token) {
+      throw new UnauthorizedException('Apple token not provided');
+    }
+
+    try {
+      const parts = dto.access_token.split('.');
+      const base64Payload = parts[1];
+      const decodedPayload = Buffer.from(base64Payload, 'base64').toString(
+        'utf-8',
+      );
+
+      const applePayload = JSON.parse(decodedPayload);
+      const email = applePayload.email;
+      const user = await this.prisma.user.findUnique({
+        where: {
+          email: email,
+        },
+      });
+
+      if (!user) {
+        //create user
+        const hashPassword = await argon2.hash('apple');
+        const newUser = await this.prisma.user.create({
+          data: {
+            first_name: dto.first_name,
+            last_name: dto.last_name,
+            email: email,
+            password: hashPassword,
+            image_url: null,
+            apple_id: applePayload.sub,
+            is_verified: true,
+          },
+        });
+
+        const newUserAccessToken = this.jwtTokken(newUser.id, newUser.email);
+        const newUserRefreshToken = this.refreshToken(
+          newUser.id,
+          newUser.email,
+        );
+
+        await this.prisma.user.update({
+          where: {
+            id: newUser.id,
+          },
+          data: {
+            refresh_token: newUserRefreshToken,
+          },
+        });
+
+        const { password, ...rest } = newUser;
+
+        return {
+          message: 'User created successfully',
+          user: {
+            ...rest,
+            access_token: newUserAccessToken,
+            refresh_token: newUserRefreshToken,
+          },
+        };
+      } else {
+        //user found
+        const oldUserAccessToken = this.jwtTokken(user.id, user.email);
+        const oldUserRefreshToken = this.refreshToken(user.id, user.email);
+        const { password, ...rest } = user;
+
+        return {
+          message: 'Login success',
+          user: {
+            ...rest,
+            access_token: oldUserAccessToken,
+            refresh_token: oldUserRefreshToken,
+          },
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching user info from apple:', error);
+      throw new UnauthorizedException('Invalid apple access token');
     }
   }
 

@@ -8,7 +8,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { SignupDto as SignupDto, LoginDto, ChangePasswordDto } from './dto';
+import {
+  SignupDto as SignupDto,
+  LoginDto,
+  ChangePasswordDto,
+  AppleSSoDto,
+} from './dto';
 import { JWtGaurd } from './gaurd';
 import { User } from '@prisma/client';
 import { GetUser } from './decorator/get-user.decorator';
@@ -38,17 +43,23 @@ export class AuthController {
   }
 
   @HttpCode(200)
-  @Post('with-google')
+  @Post('with-google/:access_token')
   loginWithGoogle(
-    @Query('access_token')
+    @Param('access_token')
     access_token: string,
   ) {
     return this.authService.loginWithGoogle(access_token);
   }
 
   @HttpCode(200)
-  @Post('change-password')
+  @Post('with-apple')
+  loginWithApple(@Body() dto: AppleSSoDto) {
+    return this.authService.loginWithApple(dto);
+  }
+
   @UseGuards(JWtGaurd)
+  @HttpCode(200)
+  @Post('change-password')
   changePassword(@GetUser() user: User, @Body() dto: ChangePasswordDto) {
     return this.authService.changePassword(user, dto);
   }
