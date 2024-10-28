@@ -13,14 +13,6 @@ export class UserService {
 
   async sendMail(email: string, name: string) {
     try {
-      //find all emails
-      // const listOfEmails = await this.prisma.user.findMany({
-      //   select: {
-      //     email: true,
-      //   },
-      // });
-      // map emails to add them in list
-      // const emailAddresses = listOfEmails.map((e) => e.email);
       const mailSent = await this.mailerService.sendMail({
         to: email,
         subject: 'Welcome to Learning Earning!',

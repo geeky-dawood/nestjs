@@ -17,7 +17,6 @@ import {
 import { JWtGaurd } from './gaurd';
 import { User } from '@prisma/client';
 import { GetUser } from './decorator/get-user.decorator';
-import { RefreshGaurd } from './gaurd/refresh.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -33,13 +32,6 @@ export class AuthController {
   @Post('signin')
   signin(@Body() dto: LoginDto) {
     return this.authService.signin(dto);
-  }
-
-  @UseGuards(RefreshGaurd)
-  @HttpCode(200)
-  @Post('/:refresh_token')
-  tokenRefresh(@Param('refresh_token') refresh_token: string) {
-    return this.authService.tokenRefresh(refresh_token);
   }
 
   @HttpCode(200)
@@ -77,5 +69,17 @@ export class AuthController {
   @Post('verify-otp')
   verifyOtp(@Body('otp') otp: string, @Body('email') email: string) {
     return this.authService.verifyOtp(otp, email);
+  }
+
+  @HttpCode(200)
+  @Post('forgot-password')
+  forgotPassword(@Body('email') email: string) {
+    return this.authService.forgotPassword(email);
+  }
+
+  @HttpCode(200)
+  @Post('/:refresh_token')
+  tokenRefresh(@Param('refresh_token') refresh_token: string) {
+    return this.authService.tokenRefresh(refresh_token);
   }
 }

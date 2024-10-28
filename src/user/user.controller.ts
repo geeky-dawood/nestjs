@@ -19,9 +19,15 @@ export class UserController {
 
   @Get()
   userDetails(@GetUser() user: User) {
-    return {
-      user: user,
-    };
+    if (user.is_verified) {
+      return {
+        user: user,
+      };
+    } else {
+      return {
+        message: 'Please verify your email to continue',
+      };
+    }
   }
 
   @Patch()

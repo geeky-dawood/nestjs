@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SignupDto, LoginDto, ChangePasswordDto, AppleSSoDto } from './dto';
 import * as argon2 from 'argon2';
@@ -6,9 +10,9 @@ import { Prisma, User } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
-import { UserService } from 'src/user/user.service';
 import { OtpService } from 'src/utils/otp/otp.service';
 import { MailService } from 'src/utils/mail/mail.service';
+import { log } from 'console';
 
 @Injectable()
 export class AuthService {
@@ -16,7 +20,6 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
     private config: ConfigService,
-    private userService: UserService,
     private otp: OtpService,
     private mailService: MailService,
   ) {}
@@ -46,22 +49,37 @@ export class AuthService {
   async signup(dto: SignupDto) {
     try {
       const hashPassword = await argon2.hash(dto.password);
-      const user = await this.prisma.user.create({
+      await this.prisma.user.create({
         data: {
           first_name: dto.first_name,
           last_name: dto.last_name,
           email: dto.email,
           password: hashPassword,
+          address: {
+            create: { ...dto.address },
+          },
         },
       });
-      const { password, ...rest } = user;
-      await this.userService.sendMail(
-        user.email,
-        `${user.first_name} ${user.last_name}`,
-      );
+
+      const otp = this.otp.generateSixDigitCode();
+      const dateTime = new Date();
+      const expiresIn = dateTime.setMinutes(dateTime.getMinutes() + 2);
+      await this.mailService.sendMail(dto.email, otp);
+
+      await this.prisma.otp.create({
+        data: {
+          otp: otp,
+          email: dto.email,
+          expiresAt: new Date(expiresIn),
+        },
+      });
+
       return {
-        message: 'User created',
-        user: rest,
+        message: 'OTP sent to your email for verification',
+        otp: otp,
+        email: dto.email,
+
+        expireAt: convertTimestampToUTC(expiresIn),
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -81,15 +99,23 @@ export class AuthService {
         where: {
           email: dto.email,
         },
+        include: {
+          address: true,
+        },
       });
 
       if (!user) {
         throw new UnauthorizedException('User with this email not found');
       }
+
       const isPasswordMatch = await argon2.verify(user.password, dto.password);
 
       if (!isPasswordMatch) {
         throw new UnauthorizedException('Password does not match');
+      }
+
+      if (user.is_verified === false) {
+        throw new UnauthorizedException('Account not verified');
       }
 
       const access_token = this.jwtTokken(user.id, user.email);
@@ -173,6 +199,7 @@ export class AuthService {
     }
 
     const url = `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${access_token}`;
+
     try {
       const data = await axios.get(url);
 
@@ -244,8 +271,8 @@ export class AuthService {
 
       // Further processing
     } catch (error) {
-      console.error('Error fetching user info from Google:', error);
-      throw new UnauthorizedException('Invalid google access token');
+      console.error('Error fetching user info from Google:', { error });
+      throw new ForbiddenException('Invalid google access token');
     }
   }
 
@@ -408,6 +435,7 @@ export class AuthService {
           expiresAt: new Date(expiresIn),
         },
       });
+
       const utcDateTime = convertTimestampToUTC(expiresIn);
       return {
         message: 'OTP sent to your email',
@@ -433,15 +461,15 @@ export class AuthService {
         },
       });
       if (!checkOtp) {
-        throw new UnauthorizedException('Invalid OTP');
+        throw new ForbiddenException('Invalid OTP');
       }
 
       if (checkOtp.isUsed) {
-        throw new UnauthorizedException('OTP already used');
+        throw new ForbiddenException('OTP already used');
       }
 
       if (checkOtp.expiresAt < new Date()) {
-        throw new UnauthorizedException('OTP expired');
+        throw new ForbiddenException('OTP expired');
       }
 
       await this.prisma.otp.update({
@@ -453,12 +481,39 @@ export class AuthService {
         },
       });
 
+      await this.prisma.user.update({
+        where: {
+          email: email,
+        },
+        data: {
+          is_verified: true,
+        },
+      });
+
       return {
         message: 'OTP verified successfully',
       };
     } catch (error) {
       console.error('Error:', error);
       throw error;
+    }
+  }
+
+  async forgotPassword(paylod: string) {
+    // Implement this method
+    const user = await this.prisma.user.findUnique({
+      where: {
+        email: paylod,
+      },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User with this email not found');
+    } else {
+      this.requestOtp(paylod);
+
+      return {
+        message: 'OTP sent to your email',
+      };
     }
   }
 }
