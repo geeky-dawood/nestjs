@@ -93,3 +93,17 @@ export class AppleSSoDto {
   @IsOptional()
   last_name?: string;
 }
+
+export class ForgotPasswordDto {
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+
+  @IsString()
+  @IsNotEmpty()
+  confirm_password: string;
+}

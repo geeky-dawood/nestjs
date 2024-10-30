@@ -4,7 +4,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { SignupDto, LoginDto, ChangePasswordDto, AppleSSoDto } from './dto';
+import {
+  SignupDto,
+  LoginDto,
+  ChangePasswordDto,
+  AppleSSoDto,
+  ForgotPasswordDto,
+} from './dto';
 import * as argon2 from 'argon2';
 import { Prisma, User } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { OtpService } from 'src/utils/otp/otp.service';
 import { MailService } from 'src/utils/mail/mail.service';
-import { log } from 'console';
+import { UserService } from 'src/user/user.service';
 
 @Injectable()
 export class AuthService {
@@ -22,6 +28,7 @@ export class AuthService {
     private config: ConfigService,
     private otp: OtpService,
     private mailService: MailService,
+    private userService: UserService,
   ) {}
 
   jwtTokken(userid: string, email: string) {
@@ -29,7 +36,7 @@ export class AuthService {
     const secret = this.config.get('JWT_SECRET');
     const tokken = this.jwt.sign(payload, {
       secret: secret,
-      expiresIn: '60s',
+      expiresIn: '1d',
     });
 
     return tokken;
@@ -40,7 +47,7 @@ export class AuthService {
     const secret = this.config.get('REFRESH_SECRET');
     const tokken = this.jwt.sign(payload, {
       secret: secret,
-      expiresIn: '2m',
+      expiresIn: '2d',
     });
 
     return tokken;
@@ -48,18 +55,9 @@ export class AuthService {
 
   async signup(dto: SignupDto) {
     try {
-      const hashPassword = await argon2.hash(dto.password);
-      await this.prisma.user.create({
-        data: {
-          first_name: dto.first_name,
-          last_name: dto.last_name,
-          email: dto.email,
-          password: hashPassword,
-          address: {
-            create: { ...dto.address },
-          },
-        },
-      });
+      dto.password = await argon2.hash(dto.password);
+
+      await this.userService.create(dto);
 
       const otp = this.otp.generateSixDigitCode();
       const dateTime = new Date();
@@ -499,22 +497,46 @@ export class AuthService {
     }
   }
 
-  async forgotPassword(paylod: string) {
-    // Implement this method
+  async forgotPassword(paylod: ForgotPasswordDto) {
     const user = await this.prisma.user.findUnique({
       where: {
-        email: paylod,
+        email: paylod.email,
       },
     });
-    if (!user) {
-      throw new UnauthorizedException('User with this email not found');
-    } else {
-      this.requestOtp(paylod);
 
-      return {
-        message: 'OTP sent to your email',
-      };
+    if (!paylod.email) {
+      throw new ForbiddenException('Email not provided');
     }
+
+    if (paylod.password !== paylod.confirm_password) {
+      {
+        throw new ForbiddenException(
+          'Password and confirm password do not match',
+        );
+      }
+    }
+
+    const matchPassword = await argon2.verify(user.password, paylod.password);
+
+    if (matchPassword) {
+      throw new ForbiddenException(
+        'Password cannot be the same as the old password',
+      );
+    }
+
+    paylod.password = await argon2.hash(paylod.password);
+
+    await this.prisma.user.update({
+      where: {
+        email: paylod.email,
+      },
+      data: {
+        password: paylod.password,
+      },
+    });
+    return {
+      message: 'Password updated successfully',
+    };
   }
 }
 

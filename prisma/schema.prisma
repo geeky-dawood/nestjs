@@ -16,6 +16,7 @@ model User {
   first_name    String?
   last_name     String?
   password      String
+  phone_number  String?
   refresh_token String?
   image_url     String?
   is_verified   Boolean   @default(false)

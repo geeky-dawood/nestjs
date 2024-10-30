@@ -13,6 +13,7 @@ import {
   LoginDto,
   ChangePasswordDto,
   AppleSSoDto,
+  ForgotPasswordDto,
 } from './dto';
 import { JWtGaurd } from './gaurd';
 import { User } from '@prisma/client';
@@ -49,13 +50,6 @@ export class AuthController {
     return this.authService.loginWithApple(dto);
   }
 
-  @UseGuards(JWtGaurd)
-  @HttpCode(200)
-  @Post('change-password')
-  changePassword(@GetUser() user: User, @Body() dto: ChangePasswordDto) {
-    return this.authService.changePassword(user, dto);
-  }
-
   @HttpCode(200)
   @Post('request-otp/')
   requestOtp(
@@ -73,8 +67,15 @@ export class AuthController {
 
   @HttpCode(200)
   @Post('forgot-password')
-  forgotPassword(@Body('email') email: string) {
-    return this.authService.forgotPassword(email);
+  forgotPassword(@Body() payload: ForgotPasswordDto) {
+    return this.authService.forgotPassword(payload);
+  }
+
+  @UseGuards(JWtGaurd)
+  @HttpCode(200)
+  @Post('change-password')
+  changePassword(@GetUser() user: User, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(user, dto);
   }
 
   @HttpCode(200)

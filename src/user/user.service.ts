@@ -3,6 +3,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { MailerService } from '@nestjs-modules/mailer';
 import { EditUserDto } from './dto/edit-user.dto';
 import { User } from '@prisma/client';
+import { SignupDto } from 'src/auth/dto';
+import { use } from 'passport';
 
 @Injectable()
 export class UserService {
@@ -10,6 +12,76 @@ export class UserService {
     private prisma: PrismaService,
     private readonly mailerService: MailerService,
   ) {}
+
+  async create(body: SignupDto) {
+    await this.prisma.user.create({
+      data: {
+        ...body,
+        address: {
+          create: body.address,
+        },
+      },
+    });
+  }
+
+  async updateUser(user: User, payload: EditUserDto) {
+    try {
+      let users;
+      const address = await this.prisma.address.findUnique({
+        where: {
+          userId: user.id,
+        },
+      });
+
+      if (address) {
+        users = await this.prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            ...payload,
+            address: {
+              update: { ...payload.address },
+            },
+          },
+          include: { address: true },
+        });
+      } else {
+        users = await this.prisma.user.update({
+          where: {
+            id: user.id,
+          },
+          data: {
+            ...payload,
+            address: { create: { ...payload.address } },
+          },
+          include: {
+            address: true,
+          },
+        });
+      }
+
+      const { password, ...rest } = users;
+      return { user: rest };
+    } catch (error) {
+      console.log(error);
+
+      throw error;
+    }
+  }
+
+  async deleteUser(user: User) {
+    try {
+      await this.prisma.user.delete({
+        where: {
+          id: user.id,
+        },
+      });
+      return { message: 'User deleted' };
+    } catch (error) {
+      throw error;
+    }
+  }
 
   async sendMail(email: string, name: string) {
     try {
@@ -38,34 +110,6 @@ export class UserService {
       return { message: 'Mail sent to', email };
     } catch (error) {
       console.log(error);
-      throw error;
-    }
-  }
-
-  async updateUser(user: User, dto: EditUserDto) {
-    try {
-      const updateUser = await this.prisma.user.update({
-        where: {
-          id: user.id,
-        },
-        data: dto,
-      });
-      const { password, ...rest } = updateUser;
-      return { user: rest };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async deleteUser(user: User) {
-    try {
-      await this.prisma.user.delete({
-        where: {
-          id: user.id,
-        },
-      });
-      return { message: 'User deleted' };
-    } catch (error) {
       throw error;
     }
   }
