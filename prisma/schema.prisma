@@ -7,24 +7,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ToDoStatus {
+  COMPLETED
+  IN_PROGRESS
+  NOT_STARTED
+}
+
+enum ToDoPriority {
+  EXTREME
+  MODERATE
+  LOW
+}
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  google_id     String?   @unique
-  apple_id      String?   @unique
-  facebook_id   String?   @unique
+  id            String   @id @default(cuid())
+  email         String   @unique
+  google_id     String?  @unique
+  apple_id      String?  @unique
+  facebook_id   String?  @unique
   first_name    String?
   last_name     String?
   password      String
   phone_number  String?
   refresh_token String?
   image_url     String?
-  is_verified   Boolean   @default(false)
-  is_deleted    Boolean   @default(false)
+  is_verified   Boolean  @default(false)
+  is_deleted    Boolean  @default(false)
   address       address?
-  bookmarks     bookmark?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  todos         todos[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@map("users")
 }
@@ -44,19 +56,6 @@ model address {
   User      User?    @relation(fields: [userId], references: [id])
 }
 
-model bookmark {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  url         String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  User        User?    @relation(fields: [userId], references: [id])
-  userId      String?  @unique
-
-  @@map("bookmarks")
-}
-
 model otp {
   id        String   @id @default(cuid())
   otp       String
@@ -65,4 +64,19 @@ model otp {
   isUsed    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model todos {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  image       String?
+  date_time   DateTime
+  is_vital    Boolean      @default(false)
+  status      ToDoStatus   @default(NOT_STARTED)
+  priority    ToDoPriority
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  userId      String
+  User        User         @relation(fields: [userId], references: [id])
 }
