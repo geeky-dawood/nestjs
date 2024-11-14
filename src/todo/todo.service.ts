@@ -1,8 +1,15 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { CreateToDoDto } from './dto/create_todo.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { ToDoPriority, ToDoStatus, User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 import { UpdateTODO } from './dto/update_todo.dto';
+import { Pagination } from 'src/utils/pagination';
+import { QueryFilterDto } from './dto/query_filter.dto';
 
 @Injectable()
 export class TodoService {
@@ -25,19 +32,47 @@ export class TodoService {
     }
   }
 
-  async getAllTodos(user: User) {
+  async getAllTodos(user: User, query?: Pagination) {
     try {
-      const todo = await this.prisma.todos.findMany({
+      const skip = (query.page - 1) * query.size;
+
+      const findManyQuery: Prisma.todosFindManyArgs = {
         where: {
           userId: user.id,
         },
-      });
-
-      return {
-        message: 'Todo fetched successfully',
-        data: [...todo],
       };
+
+      if (query.size) {
+        findManyQuery.take = +query.size;
+      }
+      if (query.page) {
+        findManyQuery.skip = skip;
+      }
+
+      const todo = await this.prisma.todos.findMany(findManyQuery);
+      if (query.size && query.page) {
+        const totalCount = await this.prisma.todos.count({
+          where: {
+            userId: user.id,
+          },
+        });
+
+        return {
+          message: 'Todo with pagination fetched successfully',
+          pagination: {
+            total_data: totalCount,
+            total_pages_on_data: totalCount / query.size,
+          },
+          data: [...todo],
+        };
+      } else {
+        return {
+          message: 'Todo fetched successfully',
+          data: [...todo],
+        };
+      }
     } catch (error) {
+      console.log(error);
       throw new ForbiddenException('Failed to fetch todos');
     }
   }
@@ -62,17 +97,14 @@ export class TodoService {
     }
   }
 
-  async getTodoByStatusOrPririty(
-    priority: ToDoPriority,
-    status: ToDoStatus,
-    user: User,
-  ) {
+  async getTodoByStatusOrPririty(query: QueryFilterDto, user: User) {
     try {
       const todo = await this.prisma.todos.findMany({
         where: {
           userId: user.id,
-          status: status,
-          priority: priority,
+          status: query.status,
+          priority: query.priority,
+          is_vital: query.is_vital,
         },
       });
 
@@ -146,29 +178,36 @@ export class TodoService {
   }
 
   async searchTodos(search: string, user: User) {
-    if (search === '') {
-      throw new ForbiddenException('Search query is empty or null');
+    if (!search) {
+      throw new BadRequestException('Search query cannot be empty');
     }
 
-    const searchQuery = search.toLowerCase();
-
     try {
-      const todo = await this.prisma.todos.findMany({
+      const todos = await this.prisma.todos.findMany({
         where: {
           userId: user.id,
           title: {
-            contains: searchQuery,
+            contains: search,
             mode: 'insensitive',
           },
         },
       });
 
+      if (todos.length === 0) {
+        return {
+          message: 'No todos match the search query',
+          data: [],
+        };
+      }
+
       return {
-        message: 'Todo fetched successfully',
-        data: [...todo],
+        message: 'Todos fetched successfully',
+        data: [...todos],
       };
     } catch (error) {
-      throw new ForbiddenException('No todo found');
+      throw new InternalServerErrorException(
+        'An error occurred while fetching todos',
+      );
     }
   }
 }

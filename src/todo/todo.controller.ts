@@ -12,9 +12,11 @@ import {
 import { JWtGaurd } from 'src/auth/gaurd';
 import { CreateToDoDto } from './dto/create_todo.dto';
 import { TodoService } from './todo.service';
-import { ToDoPriority, ToDoStatus, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { GetUser } from 'src/auth/decorator/get-user.decorator';
 import { UpdateTODO } from './dto/update_todo.dto';
+import { Pagination } from 'src/utils/pagination';
+import { QueryFilterDto } from './dto/query_filter.dto';
 
 @UseGuards(JWtGaurd)
 @Controller('todo')
@@ -27,17 +29,17 @@ export class TodoController {
   }
 
   @Get()
-  getTodos(@GetUser() user: User) {
-    return this.todoService.getAllTodos(user);
+  getTodos(@GetUser() user: User, @Query() query?: Pagination) {
+    return this.todoService.getAllTodos(user, query);
   }
 
   @Get('filter')
   getTodosByStatusOrPriority(
-    @Query('priority') priority: ToDoPriority,
-    @Query('status') status: ToDoStatus,
+    @Query() query: QueryFilterDto,
     @GetUser() user: User,
   ) {
-    return this.todoService.getTodoByStatusOrPririty(priority, status, user);
+    console.log(query);
+    return this.todoService.getTodoByStatusOrPririty(query, user);
   }
 
   @Patch('update/:id')
@@ -55,8 +57,7 @@ export class TodoController {
   }
 
   @Get('search')
-  searchTodos(@Param('search') search: string, @GetUser() user: User) {
-    console.log(search);
+  searchTodos(@Query('search') search: string, @GetUser() user: User) {
     return this.todoService.searchTodos(search, user);
   }
 

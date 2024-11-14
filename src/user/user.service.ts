@@ -4,7 +4,6 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { EditUserDto } from './dto/edit-user.dto';
 import { User } from '@prisma/client';
 import { SignupDto } from 'src/auth/dto';
-import { use } from 'passport';
 
 @Injectable()
 export class UserService {
