@@ -4,6 +4,10 @@ import { MailerService } from '@nestjs-modules/mailer';
 import { EditUserDto } from './dto/edit-user.dto';
 import { User } from '@prisma/client';
 import { SignupDto } from 'src/auth/dto';
+import { GetUserAreaSpecificDto } from 'src/todo/dto/area_specific.dto';
+import { Decimal } from '@prisma/client/runtime/library';
+import { getSpecifiAreaFilter } from 'src/utils/specific_location';
+import * as turf from '@turf/turf';
 
 @Injectable()
 export class UserService {
@@ -67,6 +71,50 @@ export class UserService {
 
       throw error;
     }
+  }
+
+  async getAreaSpecifiedUsers(payload: GetUserAreaSpecificDto) {
+    const latitude = Number(payload.lat);
+    const longitude = Number(payload.lng);
+    const radius = Number(payload.radius);
+
+    // Step 1: Create a buffer and calculate bounding box
+    const point = turf.point([longitude, latitude]);
+    const buffer = turf.buffer(point, radius, { units: 'miles' });
+    const bbox = turf.bbox(buffer); // [minLng, minLat, maxLng, maxLat]
+
+    // Step 2: Query the database using the bounding box
+    const users = await this.prisma.user.findMany({
+      include: { address: true },
+      where: {
+        address: {
+          latitude: {
+            gte: bbox[1], // minLat
+            lte: bbox[3], // maxLat
+          },
+          longitude: {
+            gte: bbox[0], // minLng
+            lte: bbox[2], // maxLng
+          },
+        },
+      },
+    });
+
+    // 31.46816376,74.35597307 current
+    // 31.48082107,74.36503471 more than 1mile
+    // 31.47998452,74.36513511 small 0.98 mile
+    // 31.48666554,74.36957388 1.52 mile
+
+    // Step 3: Refine results to ensure users are within the circular area
+    const usersWithinRadius = users.filter((user) => {
+      const userPoint = turf.point([
+        Number(user.address.longitude),
+        Number(user.address.latitude),
+      ]);
+      return turf.booleanWithin(userPoint, buffer);
+    });
+
+    return usersWithinRadius;
   }
 
   async deleteUser(user: User) {

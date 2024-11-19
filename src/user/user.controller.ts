@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Patch,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { User } from '@prisma/client';
@@ -11,6 +12,7 @@ import { GetUser } from 'src/auth/decorator/get-user.decorator';
 import { JWtGaurd } from 'src/auth/gaurd/index';
 import { UserService } from './user.service';
 import { EditUserDto } from './dto/edit-user.dto';
+import { GetUserAreaSpecificDto } from 'src/todo/dto/area_specific.dto';
 
 @UseGuards(JWtGaurd)
 @Controller('user')
@@ -28,6 +30,12 @@ export class UserController {
         message: 'Please verify your email to continue',
       };
     }
+  }
+
+  @Get('area-specified')
+  async getAreaSpecifiedUsers(@Query() dto: GetUserAreaSpecificDto) {
+    console.log(dto);
+    return await this.userService.getAreaSpecifiedUsers(dto);
   }
 
   @Patch()

@@ -8,16 +8,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import {
-  SignupDto as SignupDto,
-  LoginDto,
-  ChangePasswordDto,
-  AppleSSoDto,
-  ForgotPasswordDto,
-} from './dto';
+import { SignupDto as SignupDto, LoginDto } from './dto';
 import { JWtGaurd } from './gaurd';
 import { User } from '@prisma/client';
 import { GetUser } from './decorator/get-user.decorator';
+import { AppleSSoDto } from './dto/sso_dto/apple.dto';
+import { ForgotPasswordDto } from './dto/forgotPassword.dto';
+import { ChangePasswordDto } from './dto/chnagePassword.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -32,7 +29,7 @@ export class AuthController {
   @HttpCode(200)
   @Post('signin')
   signin(@Body() dto: LoginDto) {
-    return this.authService.signin(dto);
+    return this.authService.login(dto);
   }
 
   @HttpCode(200)

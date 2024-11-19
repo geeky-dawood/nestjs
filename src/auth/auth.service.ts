@@ -4,13 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import {
-  SignupDto,
-  LoginDto,
-  ChangePasswordDto,
-  AppleSSoDto,
-  ForgotPasswordDto,
-} from './dto';
+import { SignupDto, LoginDto } from './dto';
 import * as argon2 from 'argon2';
 import { Prisma, User } from '@prisma/client';
 import { JwtService } from '@nestjs/jwt';
@@ -19,6 +13,9 @@ import axios from 'axios';
 import { OtpService } from 'src/utils/otp/otp.service';
 import { MailService } from 'src/utils/mail/mail.service';
 import { UserService } from 'src/user/user.service';
+import { AppleSSoDto } from './dto/sso_dto/apple.dto';
+import { ChangePasswordDto } from './dto/chnagePassword.dto';
+import { ForgotPasswordDto } from './dto/forgotPassword.dto';
 
 @Injectable()
 export class AuthService {
@@ -33,9 +30,8 @@ export class AuthService {
 
   jwtTokken(userid: string, email: string) {
     const payload = { sub: userid, email: email };
-    const secret = this.config.get('JWT_SECRET');
     const tokken = this.jwt.sign(payload, {
-      secret: secret,
+      secret: this.config.get('JWT_SECRET'),
       expiresIn: '1d',
     });
 
@@ -44,9 +40,8 @@ export class AuthService {
 
   refreshToken(userid: string, email: string) {
     const payload = { sub: userid, email: email };
-    const secret = this.config.get('REFRESH_SECRET');
     const tokken = this.jwt.sign(payload, {
-      secret: secret,
+      secret: this.config.get('REFRESH_SECRET'),
       expiresIn: '2d',
     });
 
@@ -56,12 +51,9 @@ export class AuthService {
   async signup(dto: SignupDto) {
     try {
       dto.password = await argon2.hash(dto.password);
-
       await this.userService.create(dto);
-
       const otp = this.otp.generateSixDigitCode();
-      const dateTime = new Date();
-      const expiresIn = dateTime.setMinutes(dateTime.getMinutes() + 2);
+      const expiresIn = expiryDateCalculate();
       await this.mailService.sendMail(dto.email, otp);
 
       await this.prisma.otp.create({
@@ -74,7 +66,6 @@ export class AuthService {
 
       return {
         message: 'OTP sent to your email for verification',
-        otp: otp,
         email: dto.email,
 
         expireAt: convertTimestampToUTC(expiresIn),
@@ -91,7 +82,7 @@ export class AuthService {
     }
   }
 
-  async signin(dto: LoginDto) {
+  async login(dto: LoginDto) {
     try {
       const user = await this.prisma.user.findUnique({
         where: {
@@ -149,7 +140,7 @@ export class AuthService {
   async tokenRefresh(refresh_token: string) {
     try {
       const payload = this.jwt.verify(refresh_token, {
-        secret: this.config.get('REFRESH_SECRET'),
+        secret: this.config.get<string>('REFRESH_SECRET'),
       });
 
       const user = await this.prisma.user.findUnique({
@@ -196,7 +187,7 @@ export class AuthService {
       throw new UnauthorizedException('Google token not provided');
     }
 
-    const url = `https://www.googleapis.com/oauth2/v3/userinfo?access_token=${access_token}`;
+    const url = `${this.config.get('GOOGLE_API')}${access_token}`;
 
     try {
       const data = await axios.get(url);
@@ -266,8 +257,6 @@ export class AuthService {
           },
         };
       }
-
-      // Further processing
     } catch (error) {
       console.error('Error fetching user info from Google:', { error });
       throw new ForbiddenException('Invalid google access token');
@@ -421,11 +410,9 @@ export class AuthService {
       }
 
       const otp = this.otp.generateSixDigitCode();
-      const dateTime = new Date();
-      const expiresIn = dateTime.setMinutes(dateTime.getMinutes() + 2);
+      const expiresIn = expiryDateCalculate();
       await this.mailService.sendMail(email, otp);
 
-      //save this otp in the database
       await this.prisma.otp.create({
         data: {
           otp: otp,
@@ -538,9 +525,4 @@ export class AuthService {
       message: 'Password updated successfully',
     };
   }
-}
-
-function convertTimestampToUTC(timestamp: number): string {
-  const date = new Date(timestamp);
-  return date.toUTCString();
 }

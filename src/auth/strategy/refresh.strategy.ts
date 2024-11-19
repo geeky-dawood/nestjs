@@ -12,7 +12,7 @@ export class RefreshStrategy extends PassportStrategy(Strategy, 'refresh') {
   ) {
     super({
       jwtFromRequest: (req) => req.params.refresh_token,
-      secretOrKey: config.get('REFRESH_SECRET'),
+      secretOrKey: config.get<string>('REFRESH_SECRET'),
     });
   }
 
